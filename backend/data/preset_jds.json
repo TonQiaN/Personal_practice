@@ -1,0 +1,112 @@
+[
+  {
+    "id": "python-backend",
+    "title": "Python 后端工程师",
+    "summary": "负责 API 服务、数据处理和后端架构优化。",
+    "must_have": ["python", "fastapi", "sql"],
+    "nice_to_have": ["redis", "docker", "postgresql"],
+    "min_years": 3,
+    "industry_keywords": ["企业服务", "saas"],
+    "education_keywords": ["本科", "计算机"],
+    "project_keywords": ["api", "python", "postgresql"]
+  },
+  {
+    "id": "frontend-react",
+    "title": "前端工程师",
+    "summary": "负责 React 和 Next.js 前端体验建设。",
+    "must_have": ["react", "typescript", "javascript"],
+    "nice_to_have": ["next.js", "node.js"],
+    "min_years": 2,
+    "industry_keywords": ["消费互联网", "saas"],
+    "education_keywords": ["本科"],
+    "project_keywords": ["react", "next.js", "typescript"]
+  },
+  {
+    "id": "data-analyst",
+    "title": "数据分析师",
+    "summary": "负责业务数据分析、指标体系和洞察输出。",
+    "must_have": ["sql", "python", "数据分析"],
+    "nice_to_have": ["机器学习", "postgresql"],
+    "min_years": 2,
+    "industry_keywords": ["电商", "金融"],
+    "education_keywords": ["本科", "统计学", "数学"],
+    "project_keywords": ["数据分析", "sql", "python"]
+  },
+  {
+    "id": "product-manager",
+    "title": "产品经理",
+    "summary": "负责需求分析、产品设计和跨团队协作。",
+    "must_have": ["产品设计", "用户研究"],
+    "nice_to_have": ["数据分析"],
+    "min_years": 3,
+    "industry_keywords": ["消费互联网", "企业服务"],
+    "education_keywords": ["本科"],
+    "project_keywords": ["产品设计", "用户研究"]
+  },
+  {
+    "id": "ai-engineer",
+    "title": "AI 应用工程师",
+    "summary": "负责 LLM 应用开发、Prompt 工程和工作流搭建。",
+    "must_have": ["python", "langchain", "llm"],
+    "nice_to_have": ["langgraph", "prompt", "大模型"],
+    "min_years": 2,
+    "industry_keywords": ["ai", "人工智能"],
+    "education_keywords": ["本科", "计算机"],
+    "project_keywords": ["langchain", "langgraph", "llm"]
+  },
+  {
+    "id": "java-backend",
+    "title": "Java 后端工程师",
+    "summary": "负责 Java 服务开发和稳定性治理。",
+    "must_have": ["java", "sql"],
+    "nice_to_have": ["docker", "redis"],
+    "min_years": 3,
+    "industry_keywords": ["金融", "企业服务"],
+    "education_keywords": ["本科", "计算机"],
+    "project_keywords": ["java", "sql", "api"]
+  },
+  {
+    "id": "ops-engineer",
+    "title": "运维 / DevOps 工程师",
+    "summary": "负责部署、监控、CI/CD 和基础设施自动化。",
+    "must_have": ["docker", "kubernetes", "aws"],
+    "nice_to_have": ["python", "redis"],
+    "min_years": 3,
+    "industry_keywords": ["企业服务", "saas"],
+    "education_keywords": ["本科"],
+    "project_keywords": ["docker", "kubernetes", "aws"]
+  },
+  {
+    "id": "algo-engineer",
+    "title": "算法工程师",
+    "summary": "负责机器学习模型开发与效果优化。",
+    "must_have": ["python", "机器学习", "深度学习"],
+    "nice_to_have": ["大模型", "llm"],
+    "min_years": 2,
+    "industry_keywords": ["ai", "人工智能", "医疗"],
+    "education_keywords": ["硕士", "数学", "计算机"],
+    "project_keywords": ["机器学习", "深度学习", "python"]
+  },
+  {
+    "id": "growth-ops",
+    "title": "增长运营",
+    "summary": "负责增长策略、投放协同和用户转化优化。",
+    "must_have": ["数据分析"],
+    "nice_to_have": ["sql", "用户研究"],
+    "min_years": 2,
+    "industry_keywords": ["电商", "消费互联网"],
+    "education_keywords": ["本科"],
+    "project_keywords": ["数据分析", "用户研究"]
+  },
+  {
+    "id": "qa-engineer",
+    "title": "测试工程师",
+    "summary": "负责测试设计、自动化测试和质量保障。",
+    "must_have": ["python", "javascript"],
+    "nice_to_have": ["docker", "node.js"],
+    "min_years": 2,
+    "industry_keywords": ["企业服务", "消费互联网"],
+    "education_keywords": ["本科"],
+    "project_keywords": ["python", "javascript", "api"]
+  }
+]

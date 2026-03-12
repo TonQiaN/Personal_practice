@@ -1,0 +1,40 @@
+:root {
+  --bg: #f5efe4;
+  --surface: rgba(250, 246, 239, 0.88);
+  --surface-strong: #fffaf2;
+  --line: rgba(41, 36, 27, 0.12);
+  --ink: #201c15;
+  --muted: #6f6557;
+  --accent: #c8553d;
+  --accent-2: #1d6f6d;
+  --shadow: 0 24px 70px rgba(50, 30, 12, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at top left, rgba(200, 85, 61, 0.18), transparent 28%),
+    radial-gradient(circle at top right, rgba(29, 111, 109, 0.18), transparent 26%),
+    linear-gradient(180deg, #f9f2e7 0%, var(--bg) 100%);
+  font-family: var(--font-heading), sans-serif;
+}
+
+a {
+  color: inherit;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
