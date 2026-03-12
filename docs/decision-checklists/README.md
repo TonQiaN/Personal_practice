@@ -22,3 +22,5 @@ Each checklist should:
 ## Current Checklists
 
 - `logging-requirements.md`: decisions needed before implementing a fuller runtime logging system
+- `jd-pdf-agent-requirements.md`: decisions needed before implementing a JD PDF parsing agent
+- `multi-agent-framework-requirements.md`: decisions needed before evolving the demo into a multi-agent system

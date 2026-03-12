@@ -77,3 +77,23 @@ For each entry, keep it short and actionable.
 - Prevention: any integration test that touches the workflow should explicitly stub external model calls.
 - Affected files: `backend/tests/test_api.py`
 - Status: resolved
+
+### [2026-03-12] Startup Hook Was Not Reliable Enough For Database-Seeding Tests
+
+- Symptom: API tests failed because persisted JD tables and seed data were missing.
+- Trigger: relying on application startup hooks for DB init inside test execution.
+- Root cause: test client lifecycle did not guarantee the desired initialization timing for seeded persistence.
+- Fix: move app initialization into an explicit `initialize_app_state()` function and call it during module import.
+- Prevention: critical local initialization such as schema creation and seed data should not depend only on startup hooks when tests use the app directly.
+- Affected files: `backend/app/main.py`
+- Status: resolved
+
+### [2026-03-12] JD Confirmation Flow Could Overwrite Parsed Metadata
+
+- Symptom: confirming a parsed JD from the frontend could replace extracted text and file path with incomplete values.
+- Trigger: frontend sent only the edited job body back to the persistence endpoint.
+- Root cause: the draft confirmation state did not preserve the original persisted payload.
+- Fix: keep the parsed persisted JD in frontend state and send its `raw_text`, `raw_pdf_path`, and normalized payload during confirmation.
+- Prevention: when a confirmation step edits only part of a persisted object, preserve the untouched source fields explicitly.
+- Affected files: `frontend/components/match-app.tsx`
+- Status: resolved

@@ -18,10 +18,16 @@ class Settings(BaseSettings):
         default="text-embedding-3-large",
         alias="OPENAI_EMBEDDING_MODEL",
     )
+    database_url: str = Field(
+        default="postgresql+psycopg://fangyuanfu@localhost:5432/resume_agent",
+        alias="DATABASE_URL",
+    )
     max_pdf_size_mb: int = 10
     max_pdf_pages: int = 5
     preset_jd_path: Path = ROOT_DIR / "backend" / "data" / "preset_jds.json"
     runtime_log_dir: Path = ROOT_DIR / "backend" / "data" / "logs"
+    jd_upload_dir: Path = ROOT_DIR / "backend" / "data" / "jd_uploads"
+    match_parallelism: int = 4
 
 
 @lru_cache

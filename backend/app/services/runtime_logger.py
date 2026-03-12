@@ -32,11 +32,21 @@ class RuntimeLogger:
             return [self._serialize(item) for item in value]
         return value
 
-    def log(self, event_type: str, request_id: str, payload: dict[str, Any]) -> None:
+    def log(
+        self,
+        event_type: str,
+        request_id: str,
+        payload: dict[str, Any],
+        *,
+        agent_name: str | None = None,
+        graph_name: str | None = None,
+    ) -> None:
         entry = {
             "timestamp": datetime.now().isoformat(timespec="seconds"),
             "event_type": event_type,
             "request_id": request_id,
+            "agent_name": agent_name,
+            "graph_name": graph_name,
             "payload": self._serialize(payload),
         }
         line = json.dumps(entry, ensure_ascii=False)

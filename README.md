@@ -4,12 +4,14 @@ An agent system for matching resumes against job descriptions with structured ex
 
 ## Status
 
-This repository now has a runnable MVP:
+This repository now has a runnable multi-agent MVP:
 
 - FastAPI backend
-- LangGraph matching workflow
-- Next.js frontend
-- 10 preset JDs
+- LangGraph multi-agent workflow
+- Next.js frontend with Tailwind CSS and MUI
+- PostgreSQL-backed JD persistence
+- JD PDF Agent
+- 10 persisted default JDs
 - core backend tests
 
 Primary design doc:
@@ -29,12 +31,28 @@ Primary design doc:
 
 ```text
 backend/     FastAPI app, LangGraph workflow, tests, preset JDs
-frontend/    Next.js UI
+frontend/    Next.js multi-page UI
 docs/        architecture, status, decisions, backlog, handoff, error log
 tests/       reserved root-level test space
 ```
 
 Decision checklists live in `docs/decision-checklists/`.
+
+## Frontend Pages
+
+The frontend is no longer a single all-in-one page. It is split into:
+
+- `/`: landing page and product overview
+- `/jds`: JD intake, PDF parsing, manual JD creation, draft confirmation, and JD library maintenance, including deleting persisted or preset jobs
+- `/match`: resume upload, automatic matching against all current JDs, ranked results, and trace display
+- `/agents`: current multi-agent responsibilities and flow summary
+
+The visual system now uses:
+
+- Tailwind CSS for layout and utility styling
+- MUI for heavyweight UI primitives
+- light/dark mode support
+- a product-style homepage plus dashboard-style internal pages
 
 ## Run Locally
 
@@ -47,6 +65,8 @@ PYTHONPATH=backend .venv/bin/uvicorn app.main:app --reload
 ```
 
 Backend runs at `http://127.0.0.1:8000`.
+
+The backend expects a working local PostgreSQL connection in `.env`.
 
 ### Frontend
 
@@ -84,7 +104,15 @@ They include:
 - request start and completion
 - LangGraph node-level execution logs
 - model call logs
+- agent and graph identifiers
 - error and traceback details when failures occur
+
+## Matching Flow Notes
+
+- Resume parsing still runs first as a dedicated agent stage.
+- JD scoring now runs in parallel across selected jobs.
+- Explanation generation also runs in parallel across ranked jobs.
+- The frontend match page shows an animated multi-stage loading state while matching is in progress.
 
 ## Working Agreement
 
@@ -100,8 +128,12 @@ They include:
 1. Improve semantic skill matching so adjacent roles do not score too closely.
 2. Add a real PDF sample set for manual regression verification.
 3. Add optional result JSON export and richer uncertainty display.
-4. Consider persistent JD storage only after the demo is stable.
+4. Add a migration toolchain for PostgreSQL schema evolution.
 
 ## Environment Variables
 
 See `.env.example`.
+
+Useful runtime tuning:
+
+- `MATCH_PARALLELISM`: limits concurrent job scoring and explanation generation per match request

@@ -2,15 +2,20 @@ import json
 from time import perf_counter
 from uuid import uuid4
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.models import JobDescriptionInput
+from app.db import Base, engine, get_db
+from app.models import JobDescriptionInput, JobDescriptionPersistPayload
 from app.presets import load_preset_jds
 from app.services.pdf_parser import extract_pdf_text
 from app.services.runtime_logger import runtime_logger
+from app.workflows.jd_pdf_graph import run_jd_pdf_agent
+from app.workflows.resume_graph import run_resume_agent
 from app.workflows.match_graph import run_match_flow
+from app.repositories.jd_repository import delete_jd, get_jd, list_jds, upsert_jd
 
 
 app = FastAPI(title=get_settings().app_name)
@@ -23,6 +28,30 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+def initialize_app_state() -> None:
+    Base.metadata.create_all(bind=engine)
+    get_settings().jd_upload_dir.mkdir(parents=True, exist_ok=True)
+    db = next(get_db())
+    try:
+        if not list_jds(db):
+            for preset in load_preset_jds():
+                upsert_jd(
+                    db,
+                    JobDescriptionPersistPayload(
+                        job=preset,
+                        source_type="preset",
+                        status="confirmed",
+                        raw_text=preset.summary,
+                        normalized_json=preset.model_dump(),
+                        user_corrected_json=preset.model_dump(),
+                    ),
+                )
+    finally:
+        db.close()
+
+
+initialize_app_state()
+
 
 @app.get("/health")
 def health() -> dict:
@@ -30,14 +59,61 @@ def health() -> dict:
 
 
 @app.get("/api/presets")
-def get_presets() -> list[JobDescriptionInput]:
-    return load_preset_jds()
+def get_presets(db: Session = Depends(get_db)) -> list[dict]:
+    return [item.model_dump() for item in list_jds(db)]
+
+
+@app.post("/api/jds")
+def create_or_update_jd(
+    payload: JobDescriptionPersistPayload,
+    db: Session = Depends(get_db),
+) -> dict:
+    persisted = upsert_jd(db, payload)
+    return persisted.model_dump()
+
+
+@app.delete("/api/jds/{job_id}")
+def remove_jd(job_id: str, db: Session = Depends(get_db)) -> dict:
+    existing = get_jd(db, job_id)
+    if existing is None:
+        raise HTTPException(status_code=404, detail="JD 不存在。")
+
+    deleted = delete_jd(db, job_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="JD 不存在。")
+    return {"deleted": True, "job_id": job_id}
+
+
+@app.post("/api/jds/upload-pdf")
+async def upload_jd_pdf(
+    jd_pdf: UploadFile = File(...),
+    db: Session = Depends(get_db),
+) -> dict:
+    request_id = uuid4().hex
+    settings = get_settings()
+
+    if jd_pdf.content_type not in {"application/pdf", "application/octet-stream"}:
+        raise HTTPException(status_code=400, detail="当前只支持 JD PDF 上传。")
+
+    file_bytes = await jd_pdf.read()
+    raw_text = extract_pdf_text(file_bytes)
+    target_path = settings.jd_upload_dir / f"{request_id}.pdf"
+    target_path.write_bytes(file_bytes)
+    parsed = run_jd_pdf_agent(
+        pdf_path=str(target_path),
+        raw_text=raw_text,
+        request_id=request_id,
+        db=db,
+    )
+    return parsed.model_dump()
 
 
 @app.post("/api/match")
 async def match_resume(
     resume: UploadFile = File(...),
-    jobs: str = Form(...),
+    job_ids: str = Form(...),
+    custom_jobs: str | None = Form(default=None),
+    db: Session = Depends(get_db),
 ) -> dict:
     request_id = uuid4().hex
     request_started_at = perf_counter()
@@ -59,8 +135,14 @@ async def match_resume(
         raise HTTPException(status_code=400, detail="当前只支持 PDF 文件上传。")
 
     try:
-        jobs_payload = json.loads(jobs)
-        job_inputs = [JobDescriptionInput.model_validate(item) for item in jobs_payload]
+        selected_ids = json.loads(job_ids)
+        if not isinstance(selected_ids, list):
+            raise ValueError("job_ids 必须是数组。")
+        persisted_map = {item.job.id: item for item in list_jds(db)}
+        job_inputs = [persisted_map[job_id].job for job_id in selected_ids if job_id in persisted_map]
+        if custom_jobs:
+            custom_payload = json.loads(custom_jobs)
+            job_inputs.extend([JobDescriptionInput.model_validate(item) for item in custom_payload])
     except Exception as exc:
         runtime_logger.log(
             "request_failed",
@@ -108,13 +190,17 @@ async def match_resume(
                     "job_titles": [job.title for job in job_inputs],
                 },
             },
+            agent_name="match_orchestrator",
+            graph_name="match_request",
         )
         raw_text = extract_pdf_text(file_bytes)
-        result = run_match_flow(
-            raw_resume_text=raw_text,
+        resume_profile, resume_trace = run_resume_agent(raw_resume_text=raw_text, request_id=request_id)
+        result = await run_match_flow(
+            resume_profile=resume_profile,
             jobs=job_inputs,
             request_id=request_id,
         )
+        result.trace = resume_trace + result.trace
         runtime_logger.log(
             "request_completed",
             request_id,
@@ -131,6 +217,8 @@ async def match_resume(
                     "result_count": len(result.ranked_results),
                 },
             },
+            agent_name="match_orchestrator",
+            graph_name="match_request",
         )
         return result.model_dump()
     except ValueError as exc:
@@ -148,6 +236,8 @@ async def match_resume(
                     "job_count": len(job_inputs),
                 },
             },
+            agent_name="match_orchestrator",
+            graph_name="match_request",
         )
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
@@ -166,5 +256,7 @@ async def match_resume(
                 },
                 "traceback": runtime_logger.format_exception(),
             },
+            agent_name="match_orchestrator",
+            graph_name="match_request",
         )
         raise HTTPException(status_code=500, detail="匹配流程执行失败。") from exc

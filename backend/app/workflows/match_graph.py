@@ -1,70 +1,47 @@
+import asyncio
 from time import perf_counter
 from typing import TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
+from app.config import get_settings
 from app.models import JobDescriptionInput, MatchResponse, MatchResult, ResumeProfile
 from app.services.explainer import build_explanation
-from app.services.normalizer import normalize_resume
 from app.services.runtime_logger import runtime_logger
 from app.services.scoring import score_resume_against_jd
 
 
 class MatchState(TypedDict):
     request_id: str
-    raw_resume_text: str
+    resume_profile: ResumeProfile
     jobs: list[JobDescriptionInput]
     trace: list[str]
-    resume_profile: ResumeProfile | None
+    scored_results: list[MatchResult]
     ranked_results: list[MatchResult]
-    node_timings: list[dict]
 
 
-def parse_resume_node(state: MatchState) -> dict:
-    started_at = perf_counter()
-    profile = normalize_resume(state["raw_resume_text"])
-    duration_ms = round((perf_counter() - started_at) * 1000, 2)
-    runtime_logger.log(
-        "node_completed",
-        state["request_id"],
-        {
-            "node": "parse_resume",
-            "duration_ms": duration_ms,
-            "input_summary": {
-                "resume_text_length": len(state["raw_resume_text"]),
-                "job_count": len(state["jobs"]),
-            },
-            "output_summary": {
-                "years_of_experience": profile.years_of_experience,
-                "skills_count": len(profile.skills),
-                "industry_count": len(profile.industries),
-            },
-        },
-    )
-    return {
-        "resume_profile": profile,
-        "trace": state["trace"] + ["已完成简历解析与结构化抽取。"],
-        "node_timings": state["node_timings"] + [{"node": "parse_resume", "duration_ms": duration_ms}],
-    }
-
-
-def match_jobs_node(state: MatchState) -> dict:
+async def match_jobs_node(state: MatchState) -> dict:
     started_at = perf_counter()
     resume_profile = state["resume_profile"]
-    assert resume_profile is not None
+    parallelism = max(get_settings().match_parallelism, 1)
+    semaphore = asyncio.Semaphore(parallelism)
 
-    scored = [score_resume_against_jd(resume_profile, job) for job in state["jobs"]]
-    scored.sort(key=lambda item: item.total_score, reverse=True)
+    async def score_job(job: JobDescriptionInput) -> MatchResult:
+        async with semaphore:
+            return await asyncio.to_thread(score_resume_against_jd, resume_profile, job)
+
+    scored = await asyncio.gather(*(score_job(job) for job in state["jobs"]))
     duration_ms = round((perf_counter() - started_at) * 1000, 2)
     runtime_logger.log(
         "node_completed",
         state["request_id"],
         {
-            "node": "match_jobs",
+            "node": "matching_agent",
             "duration_ms": duration_ms,
             "input_summary": {
                 "job_count": len(state["jobs"]),
                 "resume_skills_count": len(resume_profile.skills),
+                "parallelism": parallelism,
             },
             "output_summary": {
                 "top_results": [
@@ -78,35 +55,72 @@ def match_jobs_node(state: MatchState) -> dict:
                 ],
             },
         },
+        agent_name="matching_agent",
+        graph_name="match_graph",
     )
 
     return {
-        "ranked_results": scored,
-        "trace": state["trace"] + [f"已完成 {len(scored)} 条 JD 的规则打分。"],
-        "node_timings": state["node_timings"] + [{"node": "match_jobs", "duration_ms": duration_ms}],
+        "scored_results": scored,
+        "trace": state["trace"] + [f"Matching Agent 已完成 {len(scored)} 条 JD 的规则打分。"],
     }
 
 
-def explain_jobs_node(state: MatchState) -> dict:
+def rank_jobs_node(state: MatchState) -> dict:
+    started_at = perf_counter()
+    ranked = sorted(state["scored_results"], key=lambda item: item.total_score, reverse=True)
+    duration_ms = round((perf_counter() - started_at) * 1000, 2)
+    runtime_logger.log(
+        "node_completed",
+        state["request_id"],
+        {
+            "node": "ranking_agent",
+            "duration_ms": duration_ms,
+            "output_summary": {
+                "top_3": [
+                    {
+                        "job_id": item.job_id,
+                        "job_title": item.job_title,
+                        "total_score": item.total_score,
+                        "recommendation": item.recommendation,
+                    }
+                    for item in ranked[:3]
+                ]
+            },
+        },
+        agent_name="ranking_agent",
+        graph_name="match_graph",
+    )
+    return {
+        "ranked_results": ranked,
+        "trace": state["trace"] + ["Ranking Agent 已完成排序、分档和 Top 3 高亮计算。"],
+    }
+
+
+async def explain_jobs_node(state: MatchState) -> dict:
     started_at = perf_counter()
     resume_profile = state["resume_profile"]
-    assert resume_profile is not None
+    parallelism = max(get_settings().match_parallelism, 1)
+    semaphore = asyncio.Semaphore(parallelism)
+    jobs_by_id = {job.id: job for job in state["jobs"]}
 
-    explained_results: list[MatchResult] = []
-    for result in state["ranked_results"]:
-        job = next(job for job in state["jobs"] if job.id == result.job_id)
-        explained_results.append(
-            result.model_copy(
-                update={
-                    "summary": build_explanation(
-                        result=result,
-                        resume=resume_profile,
-                        jd=job,
-                        request_id=state["request_id"],
-                    )
-                }
+    async def explain_result(result: MatchResult) -> MatchResult:
+        job = jobs_by_id[result.job_id]
+        async with semaphore:
+            explanation = await asyncio.to_thread(
+                build_explanation,
+                result,
+                resume_profile,
+                job,
+                state["request_id"],
             )
+        return result.model_copy(
+            update={
+                "summary": explanation.summary,
+                "explanation_details": explanation,
+            }
         )
+
+    explained_results = await asyncio.gather(*(explain_result(result) for result in state["ranked_results"]))
     duration_ms = round((perf_counter() - started_at) * 1000, 2)
     runtime_logger.log(
         "node_completed",
@@ -116,28 +130,30 @@ def explain_jobs_node(state: MatchState) -> dict:
             "duration_ms": duration_ms,
             "input_summary": {
                 "result_count": len(state["ranked_results"]),
+                "parallelism": parallelism,
             },
             "output_summary": {
                 "explained_count": len(explained_results),
             },
         },
+        agent_name="explanation_agent",
+        graph_name="match_graph",
     )
 
     return {
         "ranked_results": explained_results,
-        "trace": state["trace"] + ["已完成结果解释生成。"],
-        "node_timings": state["node_timings"] + [{"node": "explain_jobs", "duration_ms": duration_ms}],
+        "trace": state["trace"] + ["Explanation Agent 已完成详细说明生成。"],
     }
 
 
 def build_match_graph():
     builder = StateGraph(MatchState)
-    builder.add_node("parse_resume", parse_resume_node)
     builder.add_node("match_jobs", match_jobs_node)
+    builder.add_node("rank_jobs", rank_jobs_node)
     builder.add_node("explain_jobs", explain_jobs_node)
-    builder.add_edge(START, "parse_resume")
-    builder.add_edge("parse_resume", "match_jobs")
-    builder.add_edge("match_jobs", "explain_jobs")
+    builder.add_edge(START, "match_jobs")
+    builder.add_edge("match_jobs", "rank_jobs")
+    builder.add_edge("rank_jobs", "explain_jobs")
     builder.add_edge("explain_jobs", END)
     return builder.compile()
 
@@ -145,20 +161,19 @@ def build_match_graph():
 graph = build_match_graph()
 
 
-def run_match_flow(
-    raw_resume_text: str,
+async def run_match_flow(
+    resume_profile: ResumeProfile,
     jobs: list[JobDescriptionInput],
     request_id: str,
 ) -> MatchResponse:
-    state = graph.invoke(
+    state = await graph.ainvoke(
         {
             "request_id": request_id,
-            "raw_resume_text": raw_resume_text,
+            "resume_profile": resume_profile,
             "jobs": jobs,
-            "trace": ["开始执行 LangGraph 匹配工作流。"],
-            "resume_profile": None,
+            "trace": ["开始执行 Matching / Ranking / Explanation 主流程。"],
+            "scored_results": [],
             "ranked_results": [],
-            "node_timings": [],
         }
     )
     return MatchResponse(

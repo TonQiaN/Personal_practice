@@ -2,19 +2,21 @@
 
 ## System Goal
 
-Build a web demo that matches one uploaded Chinese PDF resume against multiple job descriptions and returns structured, explainable results for HR.
+Build a multi-agent web demo that matches one uploaded Chinese PDF resume against persisted job descriptions, including user-uploaded JD PDFs, and returns structured, explainable results for HR.
 
 ## High-Level Flow
 
 ```text
+upload JD PDF
+  -> JD PDF Agent
+  -> JD draft confirmation
+  -> PostgreSQL persistence
+
 upload Chinese PDF resume
-  -> choose preset JDs or input JDs
-  -> parse PDF
-  -> normalize resume and JDs
-  -> rule-based scoring
-  -> semantic matching enhancement
-  -> aggregate score per JD
-  -> generate explanation
+  -> Resume Parser Agent
+  -> Matching Agent
+  -> Ranking Agent
+  -> Explanation Agent
   -> show ranked results in web UI
 ```
 
@@ -23,47 +25,50 @@ upload Chinese PDF resume
 ### Frontend
 
 - upload resume
-- create or paste JD
-- choose from preset JDs
+- upload JD PDF
+- confirm and edit parsed JD drafts
+- choose from persisted JDs
 - view match report
 - compare multiple JD results
 
 ### Backend API
 
 - resume ingestion
-- JD creation or preset selection
-- match task creation
-- task status query
-- match result retrieval
+- JD persistence and update
+- JD PDF parsing
+- match request execution
+- result retrieval
 
 ### Agents / Workflow
 
-- parser agent
-- structuring agent
-- matching agent
-- explanation agent
+- Resume Parser Agent
+- JD PDF Agent
+- Matching Agent
+- Ranking Agent
+- Explanation Agent
 
-The workflow should be stateful and resumable.
+Normalization currently remains a shared service layer instead of a standalone agent.
 
 ## Data Model
 
 Core entities:
 
-- resume
-- job_description
-- match_result
-- task_status
+- persisted job_description
+- job_description draft
+- runtime logs
+- match result response
 
 ## Design Principles
 
 - deterministic rules for hard constraints
 - LLMs only where semantic reasoning adds value
 - lightweight step traceability for each major step
+- agents communicate through structured JSON contracts
 - low coupling between extraction and scoring
 - optimize for demo speed over full production completeness
 
 ## Open Architecture Questions
 
-- whether parsing and scoring should be fully synchronous in the MVP
-- whether preset JDs should be hardcoded JSON or editable through the UI
-- whether the first frontend should be built in Next.js or delivered as a lightweight single-page interface
+- whether JD persistence should evolve from local PostgreSQL to managed Postgres
+- whether resume data should also be persisted in a later phase
+- whether JD PDF Agent should support OCR after the text-PDF phase stabilizes

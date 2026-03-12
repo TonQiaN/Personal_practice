@@ -32,6 +32,36 @@
 - Implement runtime logging for request, node, and model-call details.
   Status: done
 
+- Implement PostgreSQL persistence for JD data.
+  Status: done
+
+- Implement JD PDF Agent as an independent LangGraph workflow.
+  Status: done
+
+- Split the frontend into multiple routed pages and add an animated matching state.
+  Status: done
+
+- Expose request IDs in the result UI for log cross-reference.
+  Status: done
+
+- Rebuild the frontend with `Tailwind CSS + MUI` and a unified dual-theme design system.
+  Status: done
+
+- Add manual JD creation and non-preset JD deletion in the management page.
+  Status: done
+
+- Upgrade match results with follow-up questions and action recommendations.
+  Status: done
+
+- Improve `/match` first-load responsiveness and remove duplicate-key rendering warnings.
+  Status: done
+
+- Allow preset JD deletion and redesign the manual JD creation form.
+  Status: done
+
+- Review and fix dark-mode surface colors across major frontend modules.
+  Status: done
+
 ## P0
 
 - Improve rule-based ranking quality.
@@ -54,13 +84,10 @@
 - Add lightweight E2E coverage for the upload-to-result flow.
   Acceptance criteria: one browser-level test validates the core demo path.
 
-- Add optional frontend debug surfacing for request IDs only.
-  Acceptance criteria: results UI shows request ID so developers can cross-reference backend logs.
-
 ## P2
 
 - Improve frontend presentation for demo quality.
-  Acceptance criteria: results page is visually polished and clearly compares multiple JD matches.
+  Acceptance criteria: results page continues to improve visual polish, information density, and performance while keeping the new design system coherent.
 
 - Add optional persistence for custom JD editing.
   Acceptance criteria: user-created JD entries can survive page refresh when persistence is intentionally enabled.

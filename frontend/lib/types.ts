@@ -10,6 +10,30 @@ export type JobDescriptionInput = {
   project_keywords: string[];
 };
 
+export type JDParseWarning = {
+  message: string;
+  severity: "low" | "medium" | "high";
+};
+
+export type PersistedJD = {
+  job: JobDescriptionInput;
+  source_type: string;
+  status: string;
+  raw_pdf_path: string | null;
+  raw_text: string;
+  normalized_json: Record<string, unknown>;
+  user_corrected_json: Record<string, unknown>;
+};
+
+export type JDParseResponse = {
+  request_id: string;
+  parsed_job: JobDescriptionInput;
+  raw_text: string;
+  warnings: JDParseWarning[];
+  trace: string[];
+  persisted: PersistedJD;
+};
+
 export type DimensionScore = {
   name: string;
   score: number;
@@ -24,6 +48,14 @@ export type MatchResult = {
   total_score: number;
   recommendation: "推荐" | "可考虑" | "不推荐";
   summary: string;
+  explanation_details: {
+    summary: string;
+    fit_reasons: string[];
+    risk_reasons: string[];
+    follow_up_questions: string[];
+    action_recommendation: string;
+    evidence: Record<string, unknown>;
+  };
   dimension_scores: DimensionScore[];
   hard_requirement_warnings: string[];
 };

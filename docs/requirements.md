@@ -85,7 +85,11 @@
 - 来源：手工录入
 - 辅助方式：系统内置默认 JD 模板
 - 默认岗位方向：互联网常见岗位
-- 第一版允许在当前 session 中新增和修改 JD，但不做持久化保存
+- 第一版允许用户上传 JD PDF，并通过 JD PDF Agent 解析后补充到 JD 列表
+- JD 数据需要持久化到 PostgreSQL
+- 数据库保存：JD 元数据、提取文本、结构化结果、用户修正结果
+- 原始 JD PDF 存本地文件，数据库仅保存文件路径
+- 简历暂时不入库
 
 ## 4.2 输出
 
@@ -95,6 +99,8 @@
 - `dimension_scores`
 - `recommendation`
 - `reasoning`
+- `follow_up_questions`
+- `action_recommendation`
 
 推荐结论当前采用简单分档，至少包含：
 
@@ -189,12 +195,13 @@
 
 ### MVP 实施约束
 
-虽然目标架构接受 `PostgreSQL + pgvector`，但第一版 MVP 不强制接数据库，优先采用文件存储或内存存储，以便尽快完成 Demo。
+虽然最早的 Demo 阶段优先采用轻量存储，但当前演进到 multi-agent 阶段后，JD 相关数据改为接入 PostgreSQL。
 
 这意味着当前阶段的技术策略是：
 
-- 架构设计按未来可接数据库预留接口
-- 实际实现先走轻量存储
+- JD 相关数据正式接入 PostgreSQL
+- 原始 JD PDF 继续保存在本地文件系统
+- 简历仍保持轻量处理，不入库
 - 当前根据 `Context7` 查询到的 OpenAI 官方文档，默认代码模型名使用 `gpt-5-codex`
 - 如果后续该模型名不可用，允许切换为兼容可用模型，但必须在文档中记录原因
 

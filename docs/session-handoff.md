@@ -12,6 +12,7 @@ Date: 2026-03-11
 - verified frontend production build passes
 - aligned docs to the runnable MVP state
 - implemented hourly JSONL runtime logs under `backend/data/logs/`
+- added PostgreSQL-backed JD persistence and JD PDF Agent
 
 ## Files To Read First Next Session
 
@@ -32,6 +33,7 @@ Date: 2026-03-11
 - adjacent roles can still score too closely without extra tuning
 - live LLM explanations are wrapped with a local fallback, so wording may differ run to run
 - runtime logs can grow over time because retention is currently unbounded
+- database schema is created directly in code; migrations are not in place yet
 
 ## Notes For Next Agent
 

@@ -64,6 +64,7 @@ For substantial work, update:
 - `docs/backlog.md`
 - `docs/session-handoff.md`
 - `docs/codex_error.md` when recurring implementation or runtime issues are discovered
+- `docs/session-records/YYYY-MM-DD-HHMM.md` with a concise end-of-session summary; for the same ongoing conversation, append to the existing session record instead of creating a new file
 
 When the user asks what needs to be decided before implementing a feature, record that checklist under `docs/decision-checklists/`.
 

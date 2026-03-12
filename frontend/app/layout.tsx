@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, Space_Grotesk } from "next/font/google";
 
+import { AppShell } from "@/components/app-shell";
+import { Providers } from "@/components/providers";
+
 import "./globals.css";
 
 const heading = Space_Grotesk({
@@ -21,8 +24,12 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="zh-CN">
-      <body className={`${heading.variable} ${mono.variable}`}>{children}</body>
+    <html lang="zh-CN" suppressHydrationWarning>
+      <body className={`${heading.variable} ${mono.variable}`}>
+        <Providers>
+          <AppShell>{children}</AppShell>
+        </Providers>
+      </body>
     </html>
   );
 }
