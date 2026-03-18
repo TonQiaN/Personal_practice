@@ -27,7 +27,9 @@ class Settings(BaseSettings):
     preset_jd_path: Path = ROOT_DIR / "backend" / "data" / "preset_jds.json"
     runtime_log_dir: Path = ROOT_DIR / "backend" / "data" / "logs"
     jd_upload_dir: Path = ROOT_DIR / "backend" / "data" / "jd_uploads"
+    resume_upload_dir: Path = ROOT_DIR / "backend" / "data" / "resume_uploads"
     match_parallelism: int = 4
+    batch_resume_parallelism: int = Field(default=2, alias="BATCH_RESUME_PARALLELISM")
 
 
 @lru_cache

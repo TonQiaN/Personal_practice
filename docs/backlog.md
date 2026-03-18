@@ -62,6 +62,30 @@
 - Review and fix dark-mode surface colors across major frontend modules.
   Status: done
 
+- Reduce first-open and route-switch waiting by caching JD data and adding page-level loading fallbacks.
+  Status: done
+
+- Restore optional manual JD selection on `/match` while keeping all-job matching as the default path.
+  Status: done
+
+- Add async batch matching for multiple resumes against multiple jobs with a dedicated page and task polling.
+  Status: done
+
+- Add `fast` and `full` match modes to trade off explanation completeness against runtime.
+  Status: done
+
+- Add resume-level concurrency inside batch matching.
+  Status: done
+
+- Deduplicate repeated terms in fit, risk, and follow-up explanations.
+  Status: done
+
+- Generate fit reasons, risk reasons, and follow-up questions via structured LLM output.
+  Status: done
+
+- Add structured next-step action recommendations to explanation output and UI.
+  Status: done
+
 ## P0
 
 - Improve rule-based ranking quality.
@@ -72,6 +96,15 @@
 
 - Add log querying utilities.
   Acceptance criteria: developer can quickly inspect recent request logs by request ID or latest hour file.
+
+- Strengthen batch-match resilience.
+  Acceptance criteria: batch tasks can survive app restarts or move to a dedicated worker when the demo needs longer-running jobs.
+
+- Add richer quick-mode labeling and export.
+  Acceptance criteria: users can clearly distinguish which results contain full explanation versus fast summary, including in exported results.
+
+- Add queue-backed execution for batch tasks.
+  Acceptance criteria: batch jobs no longer depend on the web process and can keep running across app restarts.
 
 ## P1
 

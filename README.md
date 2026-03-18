@@ -44,8 +44,14 @@ The frontend is no longer a single all-in-one page. It is split into:
 
 - `/`: landing page and product overview
 - `/jds`: JD intake, PDF parsing, manual JD creation, draft confirmation, and JD library maintenance, including deleting persisted or preset jobs
-- `/match`: resume upload, automatic matching against all current JDs, ranked results, and trace display
+- `/match`: resume upload, automatic matching against all current JDs by default, optional manual JD selection with search and source filters, ranked results, and trace display
+- `/batch-match`: multi-resume upload, asynchronous batch matching, optional manual JD selection, per-resume Top 3, and per-job Top 3 candidate views
 - `/agents`: current multi-agent responsibilities and flow summary
+
+Both `/match` and `/batch-match` now support two execution modes:
+
+- `fast`: explain only Top 3 results and keep the rest as fast rule summaries
+- `full`: explain every matched job
 
 The visual system now uses:
 
@@ -112,6 +118,7 @@ They include:
 - Resume parsing still runs first as a dedicated agent stage.
 - JD scoring now runs in parallel across selected jobs.
 - Explanation generation also runs in parallel across ranked jobs.
+- `fast` mode limits detailed explanation generation to Top 3 results.
 - The frontend match page shows an animated multi-stage loading state while matching is in progress.
 
 ## Working Agreement
@@ -137,3 +144,4 @@ See `.env.example`.
 Useful runtime tuning:
 
 - `MATCH_PARALLELISM`: limits concurrent job scoring and explanation generation per match request
+- `BATCH_RESUME_PARALLELISM`: limits how many resumes a batch task processes concurrently

@@ -57,6 +57,7 @@ def _build_dimension_scores(
         DimensionScore(
             name="技能匹配",
             score=_score_bucket((must_ratio * 0.8) + (nice_ratio * 0.2), 35),
+            max_score=35,
             matched=skill_matched + nice_matched,
             missing=skill_missing,
             note="核心技能优先，加分项次之。",
@@ -66,6 +67,7 @@ def _build_dimension_scores(
         DimensionScore(
             name="工作年限",
             score=_score_bucket(years_ratio, 20),
+            max_score=20,
             matched=[f"{resume.years_of_experience} 年经验"],
             missing=[f"要求至少 {jd.min_years} 年"] if years_ratio < 1 else [],
             note="按简历中明确可识别的年限估算。",
@@ -75,6 +77,7 @@ def _build_dimension_scores(
         DimensionScore(
             name="项目经历",
             score=_score_bucket(project_ratio, 20),
+            max_score=20,
             matched=project_matched,
             missing=project_missing,
             note="根据项目关键词和技能交叉判断。",
@@ -84,6 +87,7 @@ def _build_dimension_scores(
         DimensionScore(
             name="行业经验",
             score=_score_bucket(industry_ratio, 10),
+            max_score=10,
             matched=industry_matched,
             missing=industry_missing,
             note="只做弱匹配，不做强制迁移判断。",
@@ -93,6 +97,7 @@ def _build_dimension_scores(
         DimensionScore(
             name="教育背景",
             score=_score_bucket(edu_ratio, 5),
+            max_score=5,
             matched=edu_matched,
             missing=edu_missing,
             note="当前只识别粗粒度教育关键词。",
@@ -102,6 +107,7 @@ def _build_dimension_scores(
         DimensionScore(
             name="加分项匹配",
             score=_score_bucket(nice_ratio, 10),
+            max_score=10,
             matched=nice_matched,
             missing=nice_missing,
             note="体现可拓展能力和岗位贴合度。",

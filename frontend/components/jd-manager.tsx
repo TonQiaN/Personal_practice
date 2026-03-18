@@ -14,6 +14,7 @@ import {
 import { FileUp, Layers3, Plus, Sparkles, Trash2 } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 
+import { fetchJobsFromApi, readCachedJobs } from "@/lib/job-cache";
 import type { JDParseResponse, JobDescriptionInput, PersistedJD } from "@/lib/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
@@ -47,12 +48,15 @@ export function JDManager() {
   const [isPending, startTransition] = useTransition();
 
   const loadJobs = async () => {
-    const response = await fetch(`${API_BASE}/api/presets`, { cache: "no-store" });
-    const data = (await response.json()) as PersistedJD[];
+    const data = await fetchJobsFromApi();
     setJobs(data);
   };
 
   useEffect(() => {
+    const cached = readCachedJobs();
+    if (cached.length) {
+      setJobs(cached);
+    }
     void loadJobs().catch(() => setError("JD 列表加载失败。"));
   }, []);
 

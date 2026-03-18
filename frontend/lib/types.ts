@@ -37,6 +37,7 @@ export type JDParseResponse = {
 export type DimensionScore = {
   name: string;
   score: number;
+  max_score: number;
   matched: string[];
   missing: string[];
   note: string;
@@ -62,6 +63,7 @@ export type MatchResult = {
 
 export type MatchResponse = {
   request_id: string;
+  match_mode: "fast" | "full";
   resume_summary: {
     raw_text: string;
     years_of_experience: number;
@@ -73,5 +75,41 @@ export type MatchResponse = {
     uncertainties: string[];
   };
   ranked_results: MatchResult[];
+  trace: string[];
+};
+
+export type BatchResumeMatchResult = {
+  resume_id: string;
+  filename: string;
+  status: "completed" | "failed";
+  error: string | null;
+  top_matches: MatchResult[];
+  full_result: MatchResponse | null;
+};
+
+export type BatchJobTopCandidate = {
+  resume_id: string;
+  filename: string;
+  total_score: number;
+  recommendation: "推荐" | "可考虑" | "不推荐";
+  summary: string;
+};
+
+export type BatchJobRanking = {
+  job_id: string;
+  job_title: string;
+  top_candidates: BatchJobTopCandidate[];
+};
+
+export type BatchMatchResponse = {
+  task_id: string;
+  status: "queued" | "processing" | "completed" | "failed";
+  match_mode: "fast" | "full";
+  total_resumes: number;
+  completed_resumes: number;
+  selected_job_ids: string[];
+  resume_results: BatchResumeMatchResult[];
+  job_rankings: BatchJobRanking[];
+  errors: string[];
   trace: string[];
 };

@@ -11,20 +11,28 @@ import {
   useMediaQuery,
   useTheme,
 } from "@mui/material";
-import { BarChart3, BriefcaseBusiness, LayoutDashboard, MoonStar, Sparkles, SunMedium } from "lucide-react";
+import { BarChart3, BriefcaseBusiness, LayoutDashboard, MoonStar, Sparkles, SunMedium, UsersRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTheme as useNextTheme } from "next-themes";
+import { useEffect, useState } from "react";
 
 const navItems = [
   { href: "/jds", label: "JD 管理", icon: BriefcaseBusiness },
   { href: "/match", label: "匹配工作台", icon: BarChart3 },
+  { href: "/batch-match", label: "批量匹配", icon: UsersRound },
   { href: "/agents", label: "Agents", icon: Sparkles },
 ];
 
 function ThemeToggle() {
   const { resolvedTheme, setTheme } = useNextTheme();
-  const dark = resolvedTheme === "dark";
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const dark = mounted && resolvedTheme === "dark";
 
   return (
     <Tooltip title={dark ? "切换浅色模式" : "切换深色模式"}>
@@ -36,7 +44,7 @@ function ThemeToggle() {
           backdropFilter: "blur(20px)",
         }}
       >
-        {dark ? <SunMedium size={18} /> : <MoonStar size={18} />}
+        {mounted ? (dark ? <SunMedium size={18} /> : <MoonStar size={18} />) : <Box sx={{ width: 18, height: 18 }} />}
       </IconButton>
     </Tooltip>
   );
@@ -132,8 +140,15 @@ function SidebarContent({ pathname }: { pathname: string }) {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const theme = useTheme();
-  const desktop = useMediaQuery(theme.breakpoints.up("lg"));
+  const mediaDesktop = useMediaQuery(theme.breakpoints.up("lg"), { noSsr: true });
+  const [mounted, setMounted] = useState(false);
   const isHome = pathname === "/";
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const desktop = mounted ? mediaDesktop : false;
 
   if (isHome) {
     return (
@@ -208,7 +223,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   Workspace
                 </Typography>
                 <Typography variant="h6">
-                  {pathname === "/jds" ? "JD 管理" : pathname === "/match" ? "匹配工作台" : "Agents"}
+                  {pathname === "/jds"
+                    ? "JD 管理"
+                    : pathname === "/match"
+                      ? "匹配工作台"
+                      : pathname === "/batch-match"
+                        ? "批量匹配"
+                        : "Agents"}
                 </Typography>
               </Box>
             </Stack>

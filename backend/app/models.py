@@ -63,6 +63,7 @@ class ResumeProfile(BaseModel):
 class DimensionScore(BaseModel):
     name: str
     score: int
+    max_score: int
     matched: list[str] = Field(default_factory=list)
     missing: list[str] = Field(default_factory=list)
     note: str
@@ -92,6 +93,51 @@ class MatchResult(BaseModel):
 
 class MatchResponse(BaseModel):
     request_id: str
+    match_mode: Literal["fast", "full"] = "full"
     resume_summary: ResumeProfile
     ranked_results: list[MatchResult]
     trace: list[str]
+
+
+class ResumePersisted(BaseModel):
+    id: str
+    filename: str
+    raw_pdf_path: str
+    raw_text: str = ""
+    profile_json: dict = Field(default_factory=dict)
+
+
+class BatchResumeMatchResult(BaseModel):
+    resume_id: str
+    filename: str
+    status: Literal["completed", "failed"]
+    error: str | None = None
+    top_matches: list[MatchResult] = Field(default_factory=list)
+    full_result: MatchResponse | None = None
+
+
+class BatchJobTopCandidate(BaseModel):
+    resume_id: str
+    filename: str
+    total_score: int
+    recommendation: Literal["推荐", "可考虑", "不推荐"]
+    summary: str
+
+
+class BatchJobRanking(BaseModel):
+    job_id: str
+    job_title: str
+    top_candidates: list[BatchJobTopCandidate] = Field(default_factory=list)
+
+
+class BatchMatchResponse(BaseModel):
+    task_id: str
+    status: Literal["queued", "processing", "completed", "failed"]
+    match_mode: Literal["fast", "full"] = "full"
+    total_resumes: int
+    completed_resumes: int
+    selected_job_ids: list[str] = Field(default_factory=list)
+    resume_results: list[BatchResumeMatchResult] = Field(default_factory=list)
+    job_rankings: list[BatchJobRanking] = Field(default_factory=list)
+    errors: list[str] = Field(default_factory=list)
+    trace: list[str] = Field(default_factory=list)

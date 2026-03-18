@@ -13,6 +13,7 @@ from app.services.scoring import score_resume_against_jd
 
 class MatchState(TypedDict):
     request_id: str
+    match_mode: str
     resume_profile: ResumeProfile
     jobs: list[JobDescriptionInput]
     trace: list[str]
@@ -102,6 +103,9 @@ async def explain_jobs_node(state: MatchState) -> dict:
     parallelism = max(get_settings().match_parallelism, 1)
     semaphore = asyncio.Semaphore(parallelism)
     jobs_by_id = {job.id: job for job in state["jobs"]}
+    explain_limit = 3 if state["match_mode"] == "fast" else len(state["ranked_results"])
+    explain_targets = state["ranked_results"][:explain_limit]
+    untouched_results = state["ranked_results"][explain_limit:]
 
     async def explain_result(result: MatchResult) -> MatchResult:
         job = jobs_by_id[result.job_id]
@@ -120,7 +124,8 @@ async def explain_jobs_node(state: MatchState) -> dict:
             }
         )
 
-    explained_results = await asyncio.gather(*(explain_result(result) for result in state["ranked_results"]))
+    explained_results = await asyncio.gather(*(explain_result(result) for result in explain_targets))
+    final_results = explained_results + untouched_results
     duration_ms = round((perf_counter() - started_at) * 1000, 2)
     runtime_logger.log(
         "node_completed",
@@ -131,6 +136,8 @@ async def explain_jobs_node(state: MatchState) -> dict:
             "input_summary": {
                 "result_count": len(state["ranked_results"]),
                 "parallelism": parallelism,
+                "match_mode": state["match_mode"],
+                "explain_limit": explain_limit,
             },
             "output_summary": {
                 "explained_count": len(explained_results),
@@ -141,8 +148,13 @@ async def explain_jobs_node(state: MatchState) -> dict:
     )
 
     return {
-        "ranked_results": explained_results,
-        "trace": state["trace"] + ["Explanation Agent 已完成详细说明生成。"],
+        "ranked_results": final_results,
+        "trace": state["trace"]
+        + [
+            "Explanation Agent 已完成详细说明生成。"
+            if state["match_mode"] == "full"
+            else f"Explanation Agent 已完成 Top {len(explained_results)} 详细说明生成，其余岗位保留快速摘要。"
+        ],
     }
 
 
@@ -165,19 +177,26 @@ async def run_match_flow(
     resume_profile: ResumeProfile,
     jobs: list[JobDescriptionInput],
     request_id: str,
+    match_mode: str = "full",
 ) -> MatchResponse:
     state = await graph.ainvoke(
         {
             "request_id": request_id,
+            "match_mode": match_mode,
             "resume_profile": resume_profile,
             "jobs": jobs,
-            "trace": ["开始执行 Matching / Ranking / Explanation 主流程。"],
+            "trace": [
+                "开始执行 Matching / Ranking / Explanation 主流程。"
+                if match_mode == "full"
+                else "开始执行快速匹配主流程，详细 explanation 只保留 Top 3。"
+            ],
             "scored_results": [],
             "ranked_results": [],
         }
     )
     return MatchResponse(
         request_id=request_id,
+        match_mode=match_mode,
         resume_summary=state["resume_profile"],
         ranked_results=state["ranked_results"],
         trace=state["trace"],

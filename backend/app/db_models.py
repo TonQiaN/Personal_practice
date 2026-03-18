@@ -39,3 +39,39 @@ class RuntimeLogRecord(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
+
+
+class ResumeRecord(Base):
+    __tablename__ = "resumes"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    raw_pdf_path: Mapped[str] = mapped_column(String(500), nullable=False)
+    raw_text: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    profile_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+
+class BatchMatchTaskRecord(Base):
+    __tablename__ = "batch_match_tasks"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="queued")
+    match_mode: Mapped[str] = mapped_column(String(16), nullable=False, default="full")
+    total_resumes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    completed_resumes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    selected_job_ids: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    result_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    error_summary: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    trace: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )

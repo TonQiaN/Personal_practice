@@ -28,9 +28,9 @@ export function MatchSummaryChart({ data }: { data: ChartDatum[] }) {
           <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} width={120} interval={0} />
           <RechartsTooltip />
           <Bar dataKey="score" radius={[0, 10, 10, 0]} barSize={22}>
-            {data.map((entry) => (
+            {data.map((entry, index) => (
               <Cell
-                key={`${entry.name}-${entry.score}`}
+                key={`chart-cell-${index}-${entry.name}-${entry.score}-${entry.recommendation}`}
                 fill={
                   entry.recommendation === "推荐"
                     ? "var(--chart-primary)"

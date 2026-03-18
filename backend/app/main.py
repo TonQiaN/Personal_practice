@@ -1,16 +1,23 @@
+import asyncio
 import json
 from time import perf_counter
 from uuid import uuid4
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import BackgroundTasks, Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.db import Base, engine, get_db
-from app.models import JobDescriptionInput, JobDescriptionPersistPayload
+from app.models import (
+    JobDescriptionInput,
+    JobDescriptionPersistPayload,
+)
 from app.presets import load_preset_jds
+from app.repositories.batch_repository import create_batch_task, create_resume_record, get_batch_task
 from app.services.pdf_parser import extract_pdf_text
+from app.services.batch_match_service import process_batch_match_task
 from app.services.runtime_logger import runtime_logger
 from app.workflows.jd_pdf_graph import run_jd_pdf_agent
 from app.workflows.resume_graph import run_resume_agent
@@ -31,6 +38,14 @@ app.add_middleware(
 def initialize_app_state() -> None:
     Base.metadata.create_all(bind=engine)
     get_settings().jd_upload_dir.mkdir(parents=True, exist_ok=True)
+    get_settings().resume_upload_dir.mkdir(parents=True, exist_ok=True)
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "ALTER TABLE IF EXISTS batch_match_tasks "
+                "ADD COLUMN IF NOT EXISTS match_mode VARCHAR(16) NOT NULL DEFAULT 'full'"
+            )
+        )
     db = next(get_db())
     try:
         if not list_jds(db):
@@ -51,6 +66,26 @@ def initialize_app_state() -> None:
 
 
 initialize_app_state()
+
+
+def _resolve_job_inputs(db: Session, selected_ids: list[str], custom_jobs: str | None = None) -> list[JobDescriptionInput]:
+    persisted_map = {item.job.id: item for item in list_jds(db)}
+    job_inputs = [persisted_map[job_id].job for job_id in selected_ids if job_id in persisted_map]
+    if custom_jobs:
+        custom_payload = json.loads(custom_jobs)
+        job_inputs.extend([JobDescriptionInput.model_validate(item) for item in custom_payload])
+    return job_inputs
+
+
+def _run_batch_task(task_id: str, selected_job_ids: list[str], resumes: list[dict], match_mode: str) -> None:
+    asyncio.run(
+        process_batch_match_task(
+            task_id=task_id,
+            selected_job_ids=selected_job_ids,
+            resumes=resumes,
+            match_mode=match_mode,
+        )
+    )
 
 
 @app.get("/health")
@@ -112,6 +147,7 @@ async def upload_jd_pdf(
 async def match_resume(
     resume: UploadFile = File(...),
     job_ids: str = Form(...),
+    match_mode: str = Form(default="full"),
     custom_jobs: str | None = Form(default=None),
     db: Session = Depends(get_db),
 ) -> dict:
@@ -138,11 +174,7 @@ async def match_resume(
         selected_ids = json.loads(job_ids)
         if not isinstance(selected_ids, list):
             raise ValueError("job_ids 必须是数组。")
-        persisted_map = {item.job.id: item for item in list_jds(db)}
-        job_inputs = [persisted_map[job_id].job for job_id in selected_ids if job_id in persisted_map]
-        if custom_jobs:
-            custom_payload = json.loads(custom_jobs)
-            job_inputs.extend([JobDescriptionInput.model_validate(item) for item in custom_payload])
+        job_inputs = _resolve_job_inputs(db, selected_ids, custom_jobs)
     except Exception as exc:
         runtime_logger.log(
             "request_failed",
@@ -176,6 +208,9 @@ async def match_resume(
         )
         raise HTTPException(status_code=400, detail="至少需要传入一条 JD。")
 
+    if match_mode not in {"fast", "full"}:
+        raise HTTPException(status_code=400, detail="match_mode 只支持 fast 或 full。")
+
     try:
         file_bytes = await resume.read()
         runtime_logger.log(
@@ -199,6 +234,7 @@ async def match_resume(
             resume_profile=resume_profile,
             jobs=job_inputs,
             request_id=request_id,
+            match_mode=match_mode,
         )
         result.trace = resume_trace + result.trace
         runtime_logger.log(
@@ -260,3 +296,85 @@ async def match_resume(
             graph_name="match_request",
         )
         raise HTTPException(status_code=500, detail="匹配流程执行失败。") from exc
+
+
+@app.post("/api/batch-match")
+async def create_batch_match(
+    background_tasks: BackgroundTasks,
+    resumes: list[UploadFile] = File(...),
+    job_ids: str = Form(...),
+    match_mode: str = Form(default="full"),
+    db: Session = Depends(get_db),
+) -> dict:
+    request_id = uuid4().hex
+    settings = get_settings()
+
+    try:
+        selected_ids = json.loads(job_ids)
+        if not isinstance(selected_ids, list):
+            raise ValueError("job_ids 必须是数组。")
+        job_inputs = _resolve_job_inputs(db, selected_ids)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="JD 数据格式不正确。") from exc
+
+    if not job_inputs:
+        raise HTTPException(status_code=400, detail="至少需要传入一条 JD。")
+
+    if not resumes:
+        raise HTTPException(status_code=400, detail="至少需要上传一份简历。")
+
+    if match_mode not in {"fast", "full"}:
+        raise HTTPException(status_code=400, detail="match_mode 只支持 fast 或 full。")
+
+    saved_resumes: list[dict] = []
+    for resume in resumes:
+        if resume.content_type not in {"application/pdf", "application/octet-stream"}:
+            raise HTTPException(status_code=400, detail="批量匹配当前只支持 PDF 文件。")
+        file_bytes = await resume.read()
+        filename = resume.filename or f"resume-{uuid4().hex}.pdf"
+        target_path = settings.resume_upload_dir / f"{uuid4().hex}.pdf"
+        target_path.write_bytes(file_bytes)
+        persisted = create_resume_record(
+            db,
+            filename=filename,
+            raw_pdf_path=str(target_path),
+        )
+        saved_resumes.append(
+            {
+                "resume_id": persisted.id,
+                "filename": persisted.filename,
+                "raw_pdf_path": persisted.raw_pdf_path,
+            }
+        )
+
+    task = create_batch_task(
+        db,
+        selected_job_ids=[item.id for item in job_inputs],
+        total_resumes=len(saved_resumes),
+        match_mode=match_mode,
+    )
+    runtime_logger.log(
+        "batch_request_started",
+        task.task_id,
+        {
+            "request_context": {
+                "resume_count": len(saved_resumes),
+                "job_count": len(job_inputs),
+                "job_titles": [job.title for job in job_inputs],
+                "filenames": [item["filename"] for item in saved_resumes],
+                "match_mode": match_mode,
+            },
+        },
+        agent_name="batch_orchestrator",
+        graph_name="batch_match_task",
+    )
+    background_tasks.add_task(_run_batch_task, task.task_id, task.selected_job_ids, saved_resumes, match_mode)
+    return task.model_dump()
+
+
+@app.get("/api/batch-match/{task_id}")
+def get_batch_match_status(task_id: str, db: Session = Depends(get_db)) -> dict:
+    task = get_batch_task(db, task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="批量匹配任务不存在。")
+    return task.model_dump()

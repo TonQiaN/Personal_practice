@@ -59,6 +59,39 @@ def test_match_endpoint_returns_ranked_results():
     assert payload["ranked_results"][0]["explanation_details"]["action_recommendation"]
 
 
+def test_match_endpoint_fast_mode_only_explains_top_three():
+    with patch(
+        "app.main.extract_pdf_text",
+        return_value="5年 Python FastAPI SQL React 数据分析 产品协作经验，本科。",
+    ), patch(
+        "app.workflows.match_graph.build_explanation",
+        return_value=ExplanationDetails(
+            summary="测试说明",
+            fit_reasons=["具备关键经验。"],
+            risk_reasons=["仍需核实细节。"],
+            follow_up_questions=["请追问候选人在关键项目里的职责。"],
+            action_recommendation="建议继续推进。",
+            evidence={},
+        ),
+    ) as mocked_explainer:
+        response = client.post(
+            "/api/match",
+            files={"resume": ("resume.pdf", _make_pdf_bytes(), "application/pdf")},
+            data={
+                "job_ids": json.dumps(
+                    ["python-backend", "frontend-react", "data-analyst", "product-manager"]
+                ),
+                "match_mode": "fast",
+            },
+        )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["match_mode"] == "fast"
+    assert len(payload["ranked_results"]) == 4
+    assert mocked_explainer.call_count == 3
+
+
 def test_match_endpoint_writes_runtime_logs(tmp_path):
     settings = get_settings()
     original_log_dir = settings.runtime_log_dir
@@ -206,3 +239,45 @@ def test_delete_preset_jd_allowed_and_restore():
         },
     )
     assert restore_response.status_code == 200
+
+
+def test_batch_match_creates_completed_task():
+    with patch(
+        "app.services.batch_match_service.extract_pdf_text",
+        side_effect=[
+            "3年 Python FastAPI SQL 经验，本科，负责 API 开发。",
+            "5年 产品设计 用户研究 数据分析 经验，本科，负责 B 端产品规划。",
+        ],
+    ), patch(
+        "app.workflows.match_graph.build_explanation",
+        return_value=ExplanationDetails(
+            summary="测试说明",
+            fit_reasons=["具备关键经验。"],
+            risk_reasons=["仍需核实细节。"],
+            follow_up_questions=["请追问候选人在核心项目里的实际职责。"],
+            action_recommendation="建议进入下一轮评估。",
+            evidence={},
+        ),
+    ):
+        response = client.post(
+            "/api/batch-match",
+            files=[
+                ("resumes", ("resume-a.pdf", _make_pdf_bytes(), "application/pdf")),
+                ("resumes", ("resume-b.pdf", _make_pdf_bytes(), "application/pdf")),
+            ],
+            data={"job_ids": json.dumps(["python-backend", "product-manager"])},
+        )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["task_id"]
+    assert payload["total_resumes"] == 2
+
+    status_response = client.get(f"/api/batch-match/{payload['task_id']}")
+    assert status_response.status_code == 200
+    status_payload = status_response.json()
+    assert status_payload["status"] == "completed"
+    assert status_payload["match_mode"] == "full"
+    assert status_payload["completed_resumes"] == 2
+    assert len(status_payload["resume_results"]) == 2
+    assert status_payload["job_rankings"]

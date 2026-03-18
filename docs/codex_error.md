@@ -97,3 +97,13 @@ For each entry, keep it short and actionable.
 - Prevention: when a confirmation step edits only part of a persisted object, preserve the untouched source fields explicitly.
 - Affected files: `frontend/components/match-app.tsx`
 - Status: resolved
+
+### [2026-03-12] Hydration Mismatch From Theme And Media Query Drift
+
+- Symptom: first page load showed `Hydration failed because the server rendered HTML didn't match the client`.
+- Trigger: rendering theme-dependent icons and media-query-dependent layout during SSR.
+- Root cause: server render did not know the real `resolvedTheme` or viewport width, so the first client render differed.
+- Fix: gate theme-dependent and `useMediaQuery`-dependent UI behind a mounted check in `frontend/components/providers.tsx` and `frontend/components/app-shell.tsx`.
+- Prevention: any UI that depends on `next-themes` or viewport width should render a stable fallback before mount.
+- Affected files: `frontend/components/providers.tsx`, `frontend/components/app-shell.tsx`
+- Status: resolved
